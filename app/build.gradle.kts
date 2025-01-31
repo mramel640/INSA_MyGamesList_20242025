@@ -54,6 +54,7 @@ android {
 dependencies {
 
     implementation(libs.coil.compose)
+    implementation("io.coil-kt:coil-compose:2.2.0")
     implementation(libs.coil.network)
     implementation(libs.coil.test)
     implementation(libs.androidx.core.ktx)
