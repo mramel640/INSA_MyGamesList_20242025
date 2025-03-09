@@ -5,68 +5,56 @@ import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.insa.mygamelist.R
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import java.io.File
+import java.io.IOException
 
 object IGDB {
 
-    lateinit var covers: List<Cover>
-    lateinit var games: List<Game>
-    lateinit var genres: List<Genre>
-    lateinit var platform_logos: List<Platform_logo>
-    lateinit var platforms: List<Platform>
+    var covers: MutableList<Cover> = mutableListOf()
+    var games: MutableList<Game> = mutableListOf()
+    var genres: MutableList<Genre> = mutableListOf()
+    var platform_logos: MutableList<Platform_logo> = mutableListOf()
+    var platforms: MutableList<Platform> = mutableListOf()
 
-    fun loadcovers(context: Context) {
-        try {
-            val coversFromJson: List<Cover> = Gson().fromJson(
-                context.resources.openRawResource(R.raw.covers).bufferedReader(),
-                object : TypeToken<List<Cover>>() {}.type
-            )
-            Log.d("IGDB", "Covers loaded successfully: ${coversFromJson.size} items")
-            covers = coversFromJson
-        } catch (e: Exception) {
-            // Log en cas d'erreur
-            Log.e("IGDB", "Error loading covers: ${e.message}")
+    inline fun <reified T> loadJsonFromInternal(context: Context, filename: String): MutableList<T> {
+        val file = File(context.filesDir, filename)
+        return try {
+            if (!file.exists()) {
+                Log.w("IGDB", "⚠️ Fichier $filename introuvable en stockage interne, retour d'une liste vide.")
+                return mutableListOf()
+            }
+            val jsonText = file.readText()
+            Gson().fromJson(jsonText, object : TypeToken<MutableList<T>>() {}.type) ?: mutableListOf()
+        } catch (e: IOException) {
+            Log.e("IGDB", "❌ Erreur lors du chargement de $filename: ${e.message}")
+            mutableListOf()
         }
     }
 
-    fun loadgames(context: Context) {
-        val gamesFromJson: List<Game> = Gson().fromJson(
-            context.resources.openRawResource(R.raw.games).bufferedReader(),
-            object : TypeToken<List<Game>>() {}.type
-        )
-
-        games = gamesFromJson
+    private inline fun <reified T> saveJsonToInternal(context: Context, filename: String, data: MutableList<T>) {
+        val file = File(context.filesDir, filename)
+        try {
+            file.writeText(Gson().toJson(data))
+            Log.d("IGDB", "✅ Fichier $filename mis à jour avec succès.")
+        } catch (e: IOException) {
+            Log.e("IGDB", "❌ Erreur lors de l'écriture dans $filename: ${e.message}")
+        }
     }
 
-    fun loadgenres(context: Context) {
-        val genresFromJson: List<Genre> = Gson().fromJson(
-            context.resources.openRawResource(R.raw.genres).bufferedReader(),
-            object : TypeToken<List<Genre>>() {}.type
-        )
-
-        genres = genresFromJson
-    }
-
-    fun loadplatform_logos(context: Context) {
-        val platform_logosFromJson: List<Platform_logo> = Gson().fromJson(
-            context.resources.openRawResource(R.raw.platform_logos).bufferedReader(),
-            object : TypeToken<List<Platform_logo>>() {}.type
-        )
-
-        platform_logos = platform_logosFromJson
-    }
-
-    fun loadplatforms(context: Context) {
-        val platformsFromJson: List<Platform> = Gson().fromJson(
-            context.resources.openRawResource(R.raw.platforms).bufferedReader(),
-            object : TypeToken<List<Platform>>() {}.type
-        )
-
-        platforms = platformsFromJson
+    fun loadAllData(context: Context) {
+        covers = loadJsonFromInternal(context, "covers.json")
+        games = loadJsonFromInternal(context, "games.json")
+        genres = loadJsonFromInternal(context, "genres.json")
+        platform_logos = loadJsonFromInternal(context, "platform_logos.json")
+        platforms = loadJsonFromInternal(context, "platforms.json")
     }
 
 }
 
 data class Cover(val id: Long, val url: String)
+@Serializable
 data class Game(val id: Long, val cover: Long, val first_release_date: Long, val genres: List<Long>, val name: String, val platforms: List<Long>, val summary: String, val total_rating: Double, var favorie: Boolean = false)
 data class Genre(val id: Long, val name: String)
 data class Platform_logo(val id: Long, val url: String)

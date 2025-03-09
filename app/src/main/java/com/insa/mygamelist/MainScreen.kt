@@ -14,11 +14,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Search
@@ -31,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +51,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.insa.mygamelist.data.Game
 import com.insa.mygamelist.data.IGDB
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -55,7 +60,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(onNavigateToDetails: (Long, FavoriesDataStore, Set<String>) -> Unit, onNavigateToFavories: (FavoriesDataStore, Set<String>) -> Unit, innerPadding: PaddingValues) { //page principale
+fun MainScreen(onNavigateToDetails: (Long, FavoriesDataStore, Set<String>) -> Unit, onNavigateToFavories: (FavoriesDataStore, Set<String>) -> Unit, onNavigatetoAddGame : (FavoriesDataStore, Set<String>) -> Unit, innerPadding: PaddingValues) { //page principale
     val context = LocalContext.current //récupérer le contexte de l'application (souvent utilisé pour accéder à des ressources système, démarrer des activités, etc.)
 
     // rememberSaveable permet de garder l'état de la bar de recherche même après un changement de page
@@ -66,9 +71,13 @@ fun MainScreen(onNavigateToDetails: (Long, FavoriesDataStore, Set<String>) -> Un
     // Lire les favoris enregistrés
     val favoriteGames by favoriesDataStore.favoriteGames.collectAsState(initial = emptySet())
 
+    var games by remember { mutableStateOf<List<Game>>(emptyList()) }
 
+    LaunchedEffect(Unit) {
+        games = IGDB.loadJsonFromInternal(context, "games.json")
+    }
 
-    val filteredItems = IGDB.games.filter {game ->
+    val filteredItems = games.filter {game ->
         game.name.contains(query, ignoreCase = true) ||
         game.genres.any { genreid -> //genreid correspond à chaque id des genres pour chaque jeu "game"
             getgenrefromid(genreid).contains(query, ignoreCase=true)
@@ -136,10 +145,15 @@ fun MainScreen(onNavigateToDetails: (Long, FavoriesDataStore, Set<String>) -> Un
                         }
                     }
                     IconButton(onClick = {
-                        onNavigateToFavories.invoke( favoriesDataStore,favoriteGames) //problem ici
+                        onNavigateToFavories.invoke( favoriesDataStore,favoriteGames)
                         }
                      ) {
                         Icon(Icons.Default.Favorite, contentDescription = "Liste des favories")
+                    }
+                    IconButton(onClick = {
+                        onNavigatetoAddGame.invoke(favoriesDataStore,favoriteGames)
+                    }) {
+                        Icon(Icons.Default.Add, contentDescription = "Ajouter un jeu")
                     }
                 }
             )
@@ -169,10 +183,18 @@ fun MainScreen(onNavigateToDetails: (Long, FavoriesDataStore, Set<String>) -> Un
                             }
                     ) {
                         Row(modifier = Modifier.padding(16.dp)) {
-                            AsyncImage(
-                                model = "https:" + getcoverfromid(game.cover),
-                                contentDescription = "Image de couverture"
-                            )
+                            if (getcoverfromid(game.cover) =="Pas d'image trouvée"){
+                                AsyncImage(
+                                    model = "https://upload.wikimedia.org/wikipedia/commons/a/a3/Image-not-found.png?20210521171500",
+                                    contentDescription = "Image not found",
+                                    modifier = Modifier.size(100.dp), // Définir la taille de l'image
+                                )
+                            }else {
+                                AsyncImage(
+                                    model = "https:" + getcoverfromid(game.cover),
+                                    contentDescription = "Image de couverture"
+                                )
+                            }
 
                             Column(
                                 modifier = Modifier
@@ -225,6 +247,15 @@ fun MainScreen(onNavigateToDetails: (Long, FavoriesDataStore, Set<String>) -> Un
                                     contentDescription = "Favori vide",
                                 )
                             }
+                        }
+                        IconButton(
+                            onClick = { deleteGameFromInternalStorage(context, game.id)
+                                games = games.filterNot { it.id == game.id } // Mise à jour de la liste UI
+                                },
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 30.dp)
+                        )
+                        {
+                            Icon(imageVector = Icons.Default.Delete, contentDescription = "Supprimer le jeu")
                         }
                     }
                 }

@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -47,6 +49,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun DetailsScreen(navController: NavController, innerPadding: PaddingValues, gameId: Long, favoriesDataStore: FavoriesDataStore, favoriteGames: Set<String>) { //écran de détail du jeu
     val game = IGDB.games.find { it.id == gameId }  // Trouver le jeu correspondant à l'ID
+
+    val context = LocalContext.current
 
     if (game != null) {
         Scaffold(topBar = {
@@ -79,6 +83,15 @@ fun DetailsScreen(navController: NavController, innerPadding: PaddingValues, gam
                             )
                         }
                     }
+                    IconButton(
+                        onClick = {
+                            IGDB.games= (IGDB.games - game).toMutableList()
+                            deleteGameFromInternalStorage(context, game.id)
+                            navController.popBackStack()},
+                    )
+                    {
+                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Supprimer le jeu")
+                    }
                           },
                 navigationIcon = {
                     IconButton(onClick = {
@@ -104,11 +117,19 @@ fun DetailsScreen(navController: NavController, innerPadding: PaddingValues, gam
                     Box(modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
+                        if (getcoverfromid(game.cover) =="Pas d'image trouvée"){
                         AsyncImage(
-                            model = "https:" + getcoverfromid(game.cover),
-                            contentDescription = "Image de couverture",
+                            model = "https://upload.wikimedia.org/wikipedia/commons/a/a3/Image-not-found.png?20210521171500",
+                            contentDescription = "Image not found",
                             modifier = Modifier.size(300.dp), // Définir la taille de l'image
                         )
+                        }else {
+                            AsyncImage(
+                                model = "https:" + getcoverfromid(game.cover),
+                                contentDescription = "Image de couverture",
+                                modifier = Modifier.size(300.dp), // Définir la taille de l'image
+                            )
+                        }
                     }
                 }
 

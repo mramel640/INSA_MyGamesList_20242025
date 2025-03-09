@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -76,10 +77,19 @@ fun FavoriesScreen(onNavigateToDetails: (Long, FavoriesDataStore, Set<String>) -
                             }
                     ) {
                         Row(modifier = Modifier.padding(16.dp)) {
-                            AsyncImage(
-                                model = "https:" + getcoverfromid(game.cover),
-                                contentDescription = "Image de couverture"
-                            )
+
+                            if (getcoverfromid(game.cover) =="Pas d'image trouvée"){
+                                AsyncImage(
+                                    model = "https://upload.wikimedia.org/wikipedia/commons/a/a3/Image-not-found.png?20210521171500",
+                                    contentDescription = "Image not found",
+                                    modifier = Modifier.size(100.dp), // Définir la taille de l'image
+                                )
+                            }else {
+                                AsyncImage(
+                                    model = "https:" + getcoverfromid(game.cover),
+                                    contentDescription = "Image de couverture"
+                                )
+                            }
 
                             Column(
                                 modifier = Modifier

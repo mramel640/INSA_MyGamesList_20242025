@@ -1,5 +1,6 @@
 package com.insa.mygamelist
 
+import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -16,9 +17,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.insa.mygamelist.data.Game
 import com.insa.mygamelist.data.IGDB
 import com.insa.mygamelist.ui.theme.MyGamesListTheme
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.io.File
+import java.io.IOException
 
 
 fun getgenrefromid(id : Long): String{
@@ -63,8 +69,90 @@ fun getplatformfromid(id: Long): String{
             return platform.name
         }
     }
-    return "Pas de platforme trouvée"
+    return "Platforme inconnue"
 }
+
+fun copyJsonToInternalStorage(context: Context, filename: String) {
+    val file = File(context.filesDir, filename)
+
+    // Vérifier si le fichier existe déjà pour éviter de l'écraser
+    if (!file.exists()) {
+        try {
+            val resourceId = context.resources.getIdentifier(
+                filename.removeSuffix(".json"), "raw", context.packageName
+            )
+
+            if (resourceId == 0) {
+                throw IOException("Fichier $filename introuvable dans res/raw/")
+            }
+
+            context.resources.openRawResource(resourceId).use { inputStream ->
+                file.outputStream().use { outputStream ->
+                    inputStream.copyTo(outputStream)
+                }
+            }
+
+            println("✅ Copie de $filename réussie vers le stockage interne.")
+
+        } catch (e: IOException) {
+            e.printStackTrace()
+            println("❌ Erreur d'entrée/sortie lors de la copie de $filename : ${e.message}")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            println("❌ Erreur inattendue : ${e.message}")
+        }
+    } else {
+        println("ℹ️ Le fichier $filename existe déjà dans le stockage interne.")
+    }
+}
+
+fun saveGameToInternalStorage(context: Context, game: Game) {
+    val file = File(context.filesDir, "games.json")
+    val gamesList = if (file.exists()) {
+        val json = file.readText()
+        try {
+            Json.decodeFromString<List<Game>>(json).toMutableList()
+        } catch (e: Exception) {
+            mutableListOf()
+        }
+    } else {
+        mutableListOf()
+    }
+
+    if (gamesList.none { it.id == game.id }) {
+        gamesList.add(game)
+        file.writeText(Json.encodeToString(gamesList))
+    }
+}
+
+fun isGameIdUnique(newId: Long, existingGames: List<Game>): Boolean {
+    return existingGames.none { it.id == newId }
+}
+
+fun deleteGameFromInternalStorage(context: Context, gameId: Long) {
+    val file = File(context.filesDir, "games.json")
+
+    // Charger les jeux existants à partir du fichier
+    val gamesList = if (file.exists()) {
+        val json = file.readText()
+        try {
+            Json.decodeFromString<List<Game>>(json).toMutableList()
+        } catch (e: Exception) {
+            mutableListOf() // Si une erreur survient (par exemple fichier vide), on retourne une liste vide
+        }
+    } else {
+        mutableListOf()
+    }
+
+    // Supprimer le jeu dont l'ID correspond
+    val updatedList = gamesList.filterNot { it.id == gameId }.toMutableList()
+
+    // Si la liste a été modifiée, on la sauvegarde de nouveau
+    if (updatedList.size != gamesList.size) {
+        file.writeText(Json.encodeToString(updatedList))
+    }
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() { //gere le passage des différents écrans
@@ -79,17 +167,23 @@ class MainActivity : ComponentActivity() { //gere le passage des différents éc
     @kotlinx.serialization.Serializable
     object Favories
 
+    @kotlinx.serialization.Serializable
+    object AddGame
+
     @RequiresApi(Build.VERSION_CODES.O)
     @OptIn(ExperimentalLayoutApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
 
         super.onCreate(savedInstanceState)
 
-        IGDB.loadcovers(this) //recup les .json
-        IGDB.loadgames(this)
-        IGDB.loadgenres(this)
-        IGDB.loadplatform_logos(this)
-        IGDB.loadplatforms(this)
+        copyJsonToInternalStorage(this, "covers.json") // Copie le fichier si besoin
+        copyJsonToInternalStorage(this, "games.json") // Copie le fichier si besoin
+        copyJsonToInternalStorage(this, "genres.json") // Copie le fichier si besoin
+        copyJsonToInternalStorage(this, "platforms.json") // Copie le fichier si besoin
+        copyJsonToInternalStorage(this, "platform_logos.json") // Copie le fichier si besoin
+
+        IGDB.loadAllData(this)
+
 
         enableEdgeToEdge()
         setContent {
@@ -107,6 +201,9 @@ class MainActivity : ComponentActivity() { //gere le passage des différents éc
                                 },
                                 onNavigateToFavories = { favoriesdatastore: FavoriesDataStore, favoriteGames: Set<String> ->
                                     navController.navigate(Favories)
+                                },
+                                onNavigatetoAddGame = { favoriesdatastore: FavoriesDataStore, favoriteGames: Set<String> ->
+                                    navController.navigate(AddGame)
                                 },
                                 innerPadding
                             ) // Écran principal avec la Box cliquable
@@ -128,6 +225,21 @@ class MainActivity : ComponentActivity() { //gere le passage des différents éc
                                     navController.navigate(Details(id))
                                 },
                                 navController, innerPadding, favoriesDataStore, favoriteGames)
+                        }
+                        composable<AddGame> {
+                                backStackEntry ->
+                            val addgame : AddGame = backStackEntry.toRoute() //recrée l'objet Details à partir de NavBackStackEntry et de ses arguments.
+                            val context = LocalContext.current
+                            AddGameScreen(
+                                onGameAdded = { game ->
+                                    // Sauvegarde le jeu dans le stockage interne
+                                    saveGameToInternalStorage(context, game)
+
+                                    // Met à jour la liste de jeux dans IGDB (ou autre gestion)
+                                    IGDB.games = (IGDB.games + game).toMutableList()
+                                },
+                                navController, innerPadding
+                            )
                         }
                     }
                 }
