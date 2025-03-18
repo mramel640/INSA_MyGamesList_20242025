@@ -7,7 +7,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresApi
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.collectAsState
@@ -45,6 +44,15 @@ fun getcoverfromid(id: Long): String{
     return "Pas d'image trouvée"
 }
 
+fun getcoverfromimageid(id: Long): String{
+    for(cover in IGDB.coverstwitch){
+        if (cover.id==id){
+            return cover.image_id
+        }
+    }
+    return "Pas d'image trouvée"
+}
+
 fun getidlogofromIdplatform(id: Long): Long{
     for(platform in IGDB.platforms){
         if (platform.id==id){
@@ -75,34 +83,29 @@ fun getplatformfromid(id: Long): String{
 fun copyJsonToInternalStorage(context: Context, filename: String) {
     val file = File(context.filesDir, filename)
 
-    // Vérifier si le fichier existe déjà pour éviter de l'écraser
-    if (!file.exists()) {
-        try {
-            val resourceId = context.resources.getIdentifier(
-                filename.removeSuffix(".json"), "raw", context.packageName
-            )
+    try {
+        val resourceId = context.resources.getIdentifier(
+            filename.removeSuffix(".json"), "raw", context.packageName
+        )
 
-            if (resourceId == 0) {
-                throw IOException("Fichier $filename introuvable dans res/raw/")
-            }
-
-            context.resources.openRawResource(resourceId).use { inputStream ->
-                file.outputStream().use { outputStream ->
-                    inputStream.copyTo(outputStream)
-                }
-            }
-
-            println("✅ Copie de $filename réussie vers le stockage interne.")
-
-        } catch (e: IOException) {
-            e.printStackTrace()
-            println("❌ Erreur d'entrée/sortie lors de la copie de $filename : ${e.message}")
-        } catch (e: Exception) {
-            e.printStackTrace()
-            println("❌ Erreur inattendue : ${e.message}")
+        if (resourceId == 0) {
+            throw IOException("Fichier $filename introuvable dans res/raw/")
         }
-    } else {
-        println("ℹ️ Le fichier $filename existe déjà dans le stockage interne.")
+
+        context.resources.openRawResource(resourceId).use { inputStream ->
+            file.outputStream().use { outputStream ->
+                inputStream.copyTo(outputStream)
+            }
+        }
+
+        println("✅ Copie de $filename réussie vers le stockage interne.")
+
+    } catch (e: IOException) {
+        e.printStackTrace()
+        println("❌ Erreur d'entrée/sortie lors de la copie de $filename : ${e.message}")
+    } catch (e: Exception) {
+        e.printStackTrace()
+        println("❌ Erreur inattendue : ${e.message}")
     }
 }
 
@@ -138,12 +141,11 @@ fun deleteGameFromInternalStorage(context: Context, gameId: Long) {
         try {
             Json.decodeFromString<List<Game>>(json).toMutableList()
         } catch (e: Exception) {
-            mutableListOf() // Si une erreur survient (par exemple fichier vide), on retourne une liste vide
+            mutableListOf() // Si une erreur survient, on retourne une liste vide
         }
     } else {
         mutableListOf()
     }
-
     // Supprimer le jeu dont l'ID correspond
     val updatedList = gamesList.filterNot { it.id == gameId }.toMutableList()
 
@@ -154,34 +156,32 @@ fun deleteGameFromInternalStorage(context: Context, gameId: Long) {
 }
 
 
-@OptIn(ExperimentalMaterial3Api::class)
-class MainActivity : ComponentActivity() { //gere le passage des différents écrans
+class MainActivity : ComponentActivity() { //Gère le passage des différents écrans
 
-    @kotlinx.serialization.Serializable
+    @Serializable
     object Main
 
-    // Define a profile route that takes an ID
     @Serializable
     data class Details(val gameid: Long)
 
-    @kotlinx.serialization.Serializable
+    @Serializable
     object Favories
 
-    @kotlinx.serialization.Serializable
+    @Serializable
     object AddGame
 
     @RequiresApi(Build.VERSION_CODES.O)
-    @OptIn(ExperimentalLayoutApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
 
         super.onCreate(savedInstanceState)
 
-        copyJsonToInternalStorage(this, "covers.json") // Copie le fichier si besoin
-        copyJsonToInternalStorage(this, "games.json") // Copie le fichier si besoin
-        copyJsonToInternalStorage(this, "genres.json") // Copie le fichier si besoin
-        copyJsonToInternalStorage(this, "platforms.json") // Copie le fichier si besoin
-        copyJsonToInternalStorage(this, "platform_logos.json") // Copie le fichier si besoin
-
+        copyJsonToInternalStorage(this, "covers.json")
+        copyJsonToInternalStorage(this, "coverstwitch.json")
+        copyJsonToInternalStorage(this, "games.json")
+        copyJsonToInternalStorage(this, "gamestwitch.json")
+        copyJsonToInternalStorage(this, "genres.json")
+        copyJsonToInternalStorage(this, "platforms.json")
+        copyJsonToInternalStorage(this, "platform_logos.json")
         IGDB.loadAllData(this)
 
 
@@ -189,11 +189,11 @@ class MainActivity : ComponentActivity() { //gere le passage des différents éc
         setContent {
 
             MyGamesListTheme {
-                val navController = rememberNavController() //pour naviguer entre les écrans
+                val navController = rememberNavController() //Pour naviguer entre les écrans
 
-                Scaffold(topBar = {}) //la topBar se définie pour chaque écran dans leur classe
+                Scaffold(topBar = {}) //La topBar se définie pour chaque écran dans leur classe
                 { innerPadding ->
-                    NavHost(navController = navController, startDestination = Main) { //à l'ouverture de l'appli, on arrive sur la page main
+                    NavHost(navController = navController, startDestination = Main) { //À l'ouverture de l'appli, on arrive sur la page main
                         composable<Main> {
                             MainScreen(
                                 onNavigateToDetails = { id: Long, favoriesdatastore: FavoriesDataStore, favoriteGames: Set<String> ->
@@ -206,40 +206,36 @@ class MainActivity : ComponentActivity() { //gere le passage des différents éc
                                     navController.navigate(AddGame)
                                 },
                                 innerPadding
-                            ) // Écran principal avec la Box cliquable
+                            ) // Écran principal
                         }
                         composable<Details> {
                             backStackEntry ->
-                            val details : Details= backStackEntry.toRoute() //recrée l'objet Details à partir de NavBackStackEntry et de ses arguments.
+                            val details : Details= backStackEntry.toRoute() //Recrée l'objet Details à partir de NavBackStackEntry et de ses arguments.
                             val favoriesDataStore = FavoriesDataStore(LocalContext.current)  // Récupération de l'instance de FavoriesDataStore avec le contexte actuel
                             val favoriteGames by favoriesDataStore.favoriteGames.collectAsState(initial = emptySet())
-                            DetailsScreen(navController, innerPadding, details.gameid, favoriesDataStore, favoriteGames)
+                            DetailsScreen(navController, innerPadding, details.gameid, favoriesDataStore, favoriteGames) //Écran des details du jeu
                         }
                         composable<Favories> {
-                            backStackEntry ->
-                            val favories : Favories= backStackEntry.toRoute() //recrée l'objet Details à partir de NavBackStackEntry et de ses arguments.
-                            val favoriesDataStore = FavoriesDataStore(LocalContext.current)  // Récupération de l'instance de FavoriesDataStore avec le contexte actuel
+                            val favoriesDataStore = FavoriesDataStore(LocalContext.current)
                             val favoriteGames by favoriesDataStore.favoriteGames.collectAsState(initial = emptySet())
                             FavoriesScreen(
                                 onNavigateToDetails = { id: Long, favoriesdatastore: FavoriesDataStore, favoriteGames: Set<String> ->
                                     navController.navigate(Details(id))
                                 },
-                                navController, innerPadding, favoriesDataStore, favoriteGames)
+                                navController, innerPadding, favoriesDataStore, favoriteGames
+                            ) //Écran des favories selectionnés
                         }
                         composable<AddGame> {
-                                backStackEntry ->
-                            val addgame : AddGame = backStackEntry.toRoute() //recrée l'objet Details à partir de NavBackStackEntry et de ses arguments.
                             val context = LocalContext.current
                             AddGameScreen(
                                 onGameAdded = { game ->
                                     // Sauvegarde le jeu dans le stockage interne
                                     saveGameToInternalStorage(context, game)
-
-                                    // Met à jour la liste de jeux dans IGDB (ou autre gestion)
+                                    // Met à jour la liste de jeux dans IGDB
                                     IGDB.games = (IGDB.games + game).toMutableList()
                                 },
                                 navController, innerPadding
-                            )
+                            )// Écran d'ajout d'un jeu
                         }
                     }
                 }
@@ -247,10 +243,3 @@ class MainActivity : ComponentActivity() { //gere le passage des différents éc
         }
     }
 }
-
-
-
-
-
-
-

@@ -50,40 +50,43 @@ fun FavoriesScreen(onNavigateToDetails: (Long, FavoriesDataStore, Set<String>) -
         ), title = { Text("Mes Favories", fontWeight = FontWeight.Bold) },
             navigationIcon = {
                 IconButton(onClick = {
-                    navController.popBackStack() // Revenir à l'écran précédent grace à la pile de navigation en cliquant sur la flèche
+                    navController.popBackStack()
                 }) {
                     Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Retour")
                 }
             })
     }) { innerPadding ->
-        LazyColumn(modifier = Modifier.padding(innerPadding)) { //permet de dérouler l'écran
-
-
+        LazyColumn(modifier = Modifier.padding(innerPadding)) {
            items(jeuxfavories) { gameId -> // Pour chaque jeu dans la liste, afficher un item dans la LazyColumn
-                val game = IGDB.games.find { it.id == gameId }  // Trouver le jeu correspondant à l'ID
+                val game = IGDB.games.find { it.id == gameId }  // Trouve le jeu correspondant à l'ID
                 if (game != null) {
-
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(8.dp)
                             .background(Color(200, 200, 200), RoundedCornerShape(16.dp))
-                            .clickable { //box pour chaque jeu cliquable
+                            .clickable {
                                 onNavigateToDetails.invoke(
                                     gameId,
                                     favoriesDataStore,
                                     favoriteGames
-                                ) //invoke n'est pas obligatoire mais plus simple de comprendre que onNavigatetoDetails est une lambda
+                                )
                             }
                     ) {
                         Row(modifier = Modifier.padding(16.dp)) {
-
-                            if (getcoverfromid(game.cover) =="Pas d'image trouvée"){
-                                AsyncImage(
-                                    model = "https://upload.wikimedia.org/wikipedia/commons/a/a3/Image-not-found.png?20210521171500",
-                                    contentDescription = "Image not found",
-                                    modifier = Modifier.size(100.dp), // Définir la taille de l'image
-                                )
+                            if (game.cover == null || getcoverfromid(game.cover) =="Pas d'image trouvée" ){
+                                if(game.cover == null || getcoverfromimageid(game.cover) =="Pas d'image trouvée") {
+                                    AsyncImage(
+                                        model = "https://upload.wikimedia.org/wikipedia/commons/a/a3/Image-not-found.png?20210521171500",
+                                        contentDescription = "Image not found",
+                                        modifier = Modifier.size(100.dp),
+                                    )
+                                }else{
+                                    AsyncImage(
+                                        model = "https://images.igdb.com/igdb/image/upload/t_cover_big/" + getcoverfromimageid(game.cover)+".jpg",
+                                        contentDescription = "Image de couverture"
+                                    )
+                                }
                             }else {
                                 AsyncImage(
                                     model = "https:" + getcoverfromid(game.cover),
@@ -96,24 +99,26 @@ fun FavoriesScreen(onNavigateToDetails: (Long, FavoriesDataStore, Set<String>) -
                                     .fillMaxWidth() // Faire en sorte que la colonne occupe toute la largeur
                                     .padding(8.dp)
                             ) {
-                                //for (game in IGDB.games) {
-
-                                Text(
-                                    game.name, fontWeight = FontWeight.Bold,
-                                    textDecoration = TextDecoration.Underline
-                                )
-                                FlowRow( //gere les textes trop long pour la largeur de l'écran
-                                    modifier = Modifier.padding(top = 4.dp), // Padding optionnel pour espacer un peu les genres
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp), // Espacement horizontal entre les genres
-                                    verticalArrangement = Arrangement.spacedBy(4.dp) // Espacement vertical entre les genres
+                                if (game.name==null){
+                                    Text("Nom du jeu", fontWeight = FontWeight.Bold, textDecoration = TextDecoration.Underline)
+                                }else {
+                                    Text(game.name, fontWeight = FontWeight.Bold, textDecoration = TextDecoration.Underline)
+                                }
+                                FlowRow(
+                                    modifier = Modifier.padding(top = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Text("Genres : ")
-                                    for (genre in game.genres) {
-                                        Text(getgenrefromid(genre))
-                                        Text(" ")
+                                    if (game.genres.isNullOrEmpty()) {
+                                        Text(text = "genre indisponible")
+                                    } else {
+                                        for (genre in game.genres) {
+                                            Text(getgenrefromid(genre))
+                                            Text(" ")
+                                        }
                                     }
                                 }
-                                //}
                             }
                         }
                     }
